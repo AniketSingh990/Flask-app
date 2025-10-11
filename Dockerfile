@@ -1,4 +1,5 @@
-FROM python:3.11-slim  # upgraded Python version
+FROM python:3.11-slim
+# upgraded Python version
 
 WORKDIR /app
 
