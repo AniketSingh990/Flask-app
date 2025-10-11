@@ -2,13 +2,16 @@ pipeline {
     agent any
 
     environment {
+        DOCKER_HOST = 'tcp://localhost:2375'
+    
+        CONTAINER_NAME = 'flask-app'
         IMAGE_NAME = "flask-app:latest"
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git 'https://github.com/yourusername/flask-app.git'
+                git 'https://github.com/AniketSingh990/Flask-app.git'
             }
         }
 
