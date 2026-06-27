@@ -1,41 +1,100 @@
+
 pipeline {
+
     agent any
 
     environment {
-        DOCKER_HOST = 'tcp://localhost:2375'  // Add your Docker host here
+
+        IMAGE_NAME = "aniket967/flask-app"
+
+        IMAGE_TAG = "${BUILD_NUMBER}"
+
     }
 
     stages {
+
         stage('Checkout') {
+
             steps {
-                // Checkout main branch
-                git branch: 'main', url: 'https://github.com/AniketSingh990/Flask-app.git'
+
+                checkout scm
+
             }
+
+        }
+
+        stage('Code Scan') {
+
+            steps {
+
+                sh '''
+
+                bandit -r .
+
+                '''
+
+            }
+
         }
 
         stage('Build Docker Image') {
+
             steps {
-                // Build Docker image named flask-app
-                sh 'docker build -t flask-app .'
+
+                sh '''
+
+                docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+
+                '''
+
             }
+
         }
 
-        stage('Run Docker Container') {
+        stage('Push Docker Image') {
+
             steps {
-                // Stop previous container if running
-                sh 'docker rm -f flask-app || true'
-                // Run container in detached mode on port 5000
-                sh 'docker run -d -p 5000:5000 --name flask-app flask-app'
+
+                withCredentials([usernamePassword(
+
+                    credentialsId: 'dockerhub',
+
+                    usernameVariable: 'USER',
+
+                    passwordVariable: 'PASS'
+
+                )]) {
+
+                    sh '''
+
+                    echo "$PASS" | docker login -u "$USER" --password-stdin
+
+                    docker push ${IMAGE_NAME}:${IMAGE_TAG}
+
+                    '''
+
+                }
+
             }
+
         }
+
     }
 
     post {
+
         success {
-            echo 'Deployment Successful!'
+
+            echo "Docker Image Successfully Pushed"
+
         }
+
         failure {
-            echo 'Deployment Failed!'
+
+            echo "Pipeline Failed"
+
         }
+
     }
+
 }
