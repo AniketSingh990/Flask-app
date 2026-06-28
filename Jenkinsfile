@@ -9,7 +9,7 @@ pipeline {
 
     stages {
 
-        stage('Checkout') {
+        stage('Checkout Application Code') {
             steps {
                 checkout scm
             }
@@ -35,12 +35,12 @@ pipeline {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub',
-                    usernameVariable: 'USER',
-                    passwordVariable: 'PASS'
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
                 )]) {
 
                     sh '''
-                    echo "$PASS" | docker login -u "$USER" --password-stdin
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
                     docker push ${IMAGE_NAME}:${IMAGE_TAG}
                     '''
@@ -48,14 +48,19 @@ pipeline {
             }
         }
 
-        stage('Update K8s Repo') {
+        stage('Clone K8s Manifest Repository') {
             steps {
-
                 dir('k8s') {
-
                     git branch: 'main',
                         credentialsId: 'github',
                         url: 'https://github.com/AniketSingh990/python-k8s-manifests.git'
+                }
+            }
+        }
+
+        stage('Update deployment.yaml') {
+            steps {
+                dir('k8s') {
 
                     sh """
                     sed -i 's#image:.*#image: ${IMAGE_NAME}:${IMAGE_TAG}#' deployment.yaml
@@ -66,21 +71,54 @@ pipeline {
                     git add deployment.yaml
 
                     git commit -m "Updated image to ${IMAGE_TAG}" || true
-
-                    git push origin main
                     """
+
                 }
             }
         }
+
+        stage('Push Changes to GitHub') {
+            steps {
+
+                dir('k8s') {
+
+                    withCredentials([usernamePassword(
+                        credentialsId: 'github',
+                        usernameVariable: 'GIT_USER',
+                        passwordVariable: 'GIT_TOKEN'
+                    )]) {
+
+                        sh '''
+                        git remote set-url origin https://${GIT_USER}:${GIT_TOKEN}@github.com/AniketSingh990/python-k8s-manifests.git
+
+                        git push origin main
+                        '''
+                    }
+
+                }
+
+            }
+        }
+
     }
 
     post {
+
         success {
-            echo "Pipeline Completed Successfully"
+            echo "========================================"
+            echo "GitOps Pipeline Completed Successfully"
+            echo "Docker Image : ${IMAGE_NAME}:${IMAGE_TAG}"
+            echo "deployment.yaml Updated"
+            echo "Changes Pushed to GitHub"
+            echo "========================================"
         }
 
         failure {
-            echo "Pipeline Failed"
+            echo "========================================"
+            echo "GitOps Pipeline Failed"
+            echo "========================================"
         }
+
     }
+
 }
